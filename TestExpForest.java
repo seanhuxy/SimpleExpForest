@@ -5,7 +5,7 @@ import weka.core.Instances;
 import weka.core.converters.ConverterUtils.DataSource;
 import weka.classifiers.Evaluation;
 
-//import DiffPrivacyExpForest;
+import technion.cs.DiffPrivacyExpForest;
 
 public class TestExpForest {
 
@@ -35,7 +35,7 @@ public class TestExpForest {
 		
 		DiffPrivacyExpForest tree = new DiffPrivacyExpForest();
 		
-		tree.setMaxIteration(1000000000);
+		tree.setMaxIteration(100000);
 		tree.setMaxDepth(maxDepth);
 		tree.setEpsilon(1.0);
 		

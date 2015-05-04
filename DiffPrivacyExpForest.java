@@ -8,7 +8,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.io.Serializable;
 
-//import com.sun.corba.se.impl.javax.rmi.CORBA.Util;
+import com.sun.corba.se.impl.javax.rmi.CORBA.Util;
 
 import weka.classifiers.AbstractClassifier;
 import weka.core.*;
@@ -27,7 +27,7 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	
 	private int m_MaxIteration = 100000;
 	
-	private double m_EquilibriumThreshold = 0.1;
+	private double m_EquilibriumThreshold = 0.0005;
 	
 	private Random m_Random = new Random();
 	
@@ -35,7 +35,6 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	
 	private Node m_Root;
 	private Set<Node> m_InnerNodes = new HashSet<Node>();
-	//private Set<Node> m_LeafNodes = new HashSet<Node>();
 	
 	public void setEpsilon(double e){
 		m_Epsilon = new BigDecimal(e);
@@ -207,34 +206,30 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	 * @param node the node whose attribute and whose descendants' 
 	 * 		  attributes should be removed from {@code attrs}
 	 */
-	private void rmDescAttrs(Set<Attribute> attrs, Node node){
+	private void rmChildrenAttrs(Set<Attribute> attrs, Node node){
 
-		if(node.splitAttr != null)
-		{
-			attrs.remove(node.splitAttr);
-			return;
-		}
+		if( node == null || node.splitAttr == null ) return;
 		
+		// remove its own attributes
+		attrs.remove(node.splitAttr);
+		
+		if( node.children == null) return;
+		
+		// remove children's attributes
 		for(Node child : node.children)			
-			rmDescAttrs(attrs, child);
+			rmChildrenAttrs(attrs, child);
 	}
 	
-	private Set<Attribute> rmRelatedAttrs(Set<Attribute> all, Node node){
+	private void rmParentAttrs(Set<Attribute> attrs, Node node){
+	
+		if( node == null) return;
 		
-		Set<Attribute> attrs = new HashSet<Attribute>(all);
-		
-		// remove attributes that is used as splitAttr by ancestors
 		Node parent = node.parent;
 		while(parent != null)
 		{
 			attrs.remove( parent.splitAttr );
 			parent = parent.parent;
 		}
-		
-		// remove attributes that is used as splitAttr by descendants
-		rmDescAttrs(attrs, node);
-		
-		return attrs;
 	}
 	
 	/**
@@ -247,13 +242,14 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	 * @param attrs the set of attribute to be chosen from
 	 * @return
 	 */
+	/*
 	private Attribute randomSelectAttr(Set<Attribute> attrs){
 		
 		// randomly select an attribute from attrs
 		Attribute attr 
 			= (Attribute)attrs.toArray()[m_Random.nextInt(attrs.size())];
 		return attr;
-	}
+	}*/
 
 	private Instances[] partitionByAttr(Instances data, Attribute attr){
 		
@@ -269,15 +265,15 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 		while(instEnum.hasMoreElements())
 		{
 			Instance inst = instEnum.nextElement();
-			
-			//System.out.println("inst value:"+index);
-			
 			parts[(int)inst.value(attr)].add(inst);
 		}
 		
 		return parts;
 	}
-	
+	/**
+	 * @param node
+	 * set count and dist
+	 */
 	private void makeLeafNode(Node node){
 		node.splitAttr = null;
 		node.children  = null;
@@ -295,7 +291,6 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 		if( Utils.sum(node.dist) != 0.0)
 			Utils.normalize(node.dist);
 		
-		//m_LeafNodes.add(node);// XXX m_LeafNodes
 		return;
 	}
 	
@@ -333,7 +328,6 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 		}
 		attrs.add(splitAttr);
 		node.children = children;
-
 	}
 	
 	private void redistribute(Node node, Node orgNode){
@@ -436,7 +430,7 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	 * @param new_score
 	 * @return
 	 */
-	final int s_BufferSize = 10000;
+	final int s_BufferSize = 1000;
     int s_InitPointer = 0;
 	int s_Pointer = 0;
 	double[] s_ScoreBuffer = new double[s_BufferSize];
@@ -481,20 +475,18 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 			variance += deltaVariance(s_ScoreBuffer, s_Pointer, newScore);
 		}*/
 		
-		variance = Utils.variance(s_ScoreBuffer);
-		
 		s_ScoreBuffer[s_Pointer] = newScore;
 		++ s_Pointer;
 		
+		variance = Utils.variance(s_ScoreBuffer);
+		System.out.printf("  Variance: %f", variance);
+		
 		if( variance < m_EquilibriumThreshold){
-			
 			//variance = -1.;
 			s_InitPointer = 0;
 			s_Pointer = 0;
-			
 			return true;
 		}
-		
 		return false;
 		
 		/*
@@ -505,7 +497,6 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 		if( diff < m_EquilibriumThreshold){
 			return true;
 		}
-	
 		return false;*/
 	}
 	
@@ -527,8 +518,10 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 		
 		if(node.splitAttr == null) return;
 		
-		if(node.children != null){
-			for(Node child: node.children){
+		if(node.children != null)
+		{
+			for(Node child: node.children)
+			{
 				addToInnerNodes(child);
 			}
 		}
@@ -555,7 +548,7 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
         
         double totalScore = m_ScoreFunc.score(m_Root);
         
-        System.out.println("Init Score:"+totalScore);
+        //System.out.println("Init Score:"+totalScore);
        
         boolean b_Equilibrium = false;
         
@@ -569,16 +562,29 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
         	Node node = (Node)m_InnerNodes.toArray()
         				[m_Random.nextInt(m_InnerNodes.size())];
         	
-        	Set<Attribute> subAttrs = rmRelatedAttrs(allAttributes, node);
+    		Set<Attribute> subAttrs = new HashSet<Attribute>(allAttributes);
+    		//subAttrs.addAll(allAttributes);
+    		rmParentAttrs(subAttrs, node);
+    		
+    		Set<Attribute> attrsWoParents = new HashSet<Attribute>(subAttrs);
+    		
+    		rmChildrenAttrs(subAttrs, node);
         	
             // randomly select attribute in the attribute pool
-        	Attribute Aj = randomSelectAttr(subAttrs);
+    		Attribute Aj;
+    		if( subAttrs.size() == 0){
+    			Aj = (Attribute)attrsWoParents.toArray()[m_Random.nextInt(attrsWoParents.size())];
+    		}else
+    			Aj = (Attribute)subAttrs.toArray()[m_Random.nextInt(subAttrs.size())];
         	
+   
+    		//subAttrs = new HashSet<Attribute>(allAttributes);
+    		//subAttrs.addAll(allAttributes);
+    		//rmParentAttrs(subAttrs, node);
+    		
         	Node orgNode = node;
-        	Node newNode = createNewNode(node, subAttrs, Aj); //
+        	Node newNode = createNewNode(node, attrsWoParents, Aj); 
         	
-        	//double orgScore = totalScore;
-        	//double newScore = getNewScore(totalScore, orgNode, newNode);
         	double orgScore = m_ScoreFunc.score(orgNode);
         	double newScore = m_ScoreFunc.score(newNode);
         			
@@ -587,8 +593,13 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
     		
     		totalScore = m_ScoreFunc.score(m_Root);
     		
-    		System.out.format("Iter[%d]  total:%.5f  org:%.5f new:%.5f  variance:%.5f", 
-    				iteration, totalScore, orgScore, newScore, variance);
+    		//System.out.format("Iter[%d]  total:%.5f  org:%.5f new:%.5f  variance:%.5f", 
+    		//		iteration, totalScore, orgScore, newScore, variance);
+    		
+    		//System.out.format("Iter[%d]org:%.5f new:%.5f\n", 
+    	    //				iteration, orgScore, newScore);
+    		//System.out.format("        exp:%.5f exp:%.5f\n", 
+    		//							orgExpScore, newExpScore);
     		
     		//double prop = Math.min(1., newExpScore/orgExpScore);
     		
@@ -596,11 +607,12 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
     		
     		boolean b_Replace = ( m_Random.nextDouble() <= newExpScore/(newExpScore+orgExpScore) );
     		
+    		//boolean b_Replace = ( m_Random.nextDouble() <= newScore/(newScore+orgScore) );
     		//boolean b_Replace = (newExpScore>orgExpScore);
     		
     		if(b_Replace)
     		{
-    			System.out.println(" : replaced");
+    			//System.out.println(" : replaced");
     			
     			Node parent = orgNode.parent;
     			
@@ -611,16 +623,25 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	    			parent.children[orgNode.index] = newNode;
     			}
     			
+    			//System.out.printf("prevNode: %f  postNode: %f\n", orgScore, newScore);
+    			
+    			System.out.printf("prev: %f  ", totalScore);
+    			
     			// check if the tree reaches a state of equilibrium.
     			totalScore = m_ScoreFunc.score(m_Root);
+    			
+    			System.out.printf("post: %f  ", totalScore);
+    			
         		b_Equilibrium = isEquilibrium(totalScore);
+        		
+        		System.out.printf("\n");
         		
         		// remove old nodes from m_InnerNode
         		rmFromInnerNodes(orgNode);
         		addToInnerNodes(newNode);
     		}
     		else{
-    			System.out.println();
+    			//System.out.println();
     		}
         }
 
