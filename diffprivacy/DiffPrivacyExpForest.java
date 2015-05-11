@@ -38,9 +38,14 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	private Node m_Root;
 	private Set<Node> m_InnerNodes = new HashSet<Node>();
 	
-	public void setEpsilon(double e){
-		m_Epsilon = new BigDecimal(e);
-	}
+	// public void setEpsilon(double e){
+	// 	m_Epsilon = new BigDecimal(e);
+	// }
+
+    public void setEpsilon(String eStr) {
+      if (eStr!=null && eStr.length()!=0)
+             m_Epsilon = new BigDecimal(eStr,MATH_CONTEXT);
+    }
 	
 	public void setMaxIteration(int it){
 		m_MaxIteration = it;
@@ -481,7 +486,7 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 		++ s_Pointer;
 		
 		variance = Utils.variance(s_ScoreBuffer);
-		System.out.printf("  Variance: %f", variance);
+		//System.out.printf("  Variance: %f", variance);
 		
 		if( variance < m_EquilibriumThreshold){
 			//variance = -1.;
@@ -625,26 +630,22 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	    			parent.children[orgNode.index] = newNode;
     			}
     			
-    			//System.out.printf("prevNode: %f  postNode: %f\n", orgScore, newScore);
-    			
-    			System.out.printf("prev: %f  ", totalScore);
+    			//System.out.printf("prev: %f  ", totalScore);
     			
     			// check if the tree reaches a state of equilibrium.
     			totalScore = m_ScoreFunc.score(m_Root);
     			
-    			System.out.printf("post: %f  ", totalScore);
+    			//System.out.printf("post: %f  ", totalScore);
     			
         		b_Equilibrium = isEquilibrium(totalScore);
         		
-        		System.out.printf("\n");
+        		//System.out.printf("\n");
         		
         		// remove old nodes from m_InnerNode
         		rmFromInnerNodes(orgNode);
         		addToInnerNodes(newNode);
     		}
-    		else{
-    			//System.out.println();
-    		}
+
         }
 
         // adding Laplace noise in the leaf node
