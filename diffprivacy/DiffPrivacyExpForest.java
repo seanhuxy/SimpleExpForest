@@ -27,9 +27,9 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	
 	private int m_MaxDepth = 5;
 	
-	private int m_MaxIteration = 100000;
+	private long m_MaxIteration = 1000000000;
 	
-	private double m_EquilibriumThreshold = 0.0005;
+	private double m_EquilibriumThreshold = 0.00005;
 	
 	private Random m_Random = new Random();
 	
@@ -437,7 +437,7 @@ public class DiffPrivacyExpForest extends AbstractClassifier{
 	 * @param new_score
 	 * @return
 	 */
-	final int s_BufferSize = 1000;
+	final int s_BufferSize = 1000000;
     int s_InitPointer = 0;
 	int s_Pointer = 0;
 	double[] s_ScoreBuffer = new double[s_BufferSize];
